@@ -523,11 +523,24 @@ class Buffer
     @buffer.collect { |b| b.length }.sum
   end
 
+  def sum
+    @buffer.collect { |b| b.sum }.sum
+  end
+
+  def last
+    unless @block.empty?
+      @buffer += [@block]
+      @block = []
+    end
+  end
+
   def subary(ofs, len)
     buf_idx = ofs / BLOCK_SIZE
     buf_ofs = ofs % BLOCK_SIZE
+
     tmp = @buffer[buf_idx] # TODO Check buffer reference
-    tmp += @buffer[buf_idx+1] if buf_ofs+len > tmp.length # TODO Check buffer end
+    tmp ||= []
+    tmp += @buffer[buf_idx+1] if buf_ofs+len > tmp.length and buf_idx+1 < @buffer.length  # TODO Check buffer end
     tmp[buf_ofs, len]
   end
 
@@ -634,6 +647,7 @@ class Loader
       end
     end
     reader.close
+    @durations.last
     @durations
   end
 
@@ -649,6 +663,7 @@ class Loader
 
   def print_dur
     puts "durations length: #{@durations.length}"
+    puts "durations samples: #{@durations.sum}"
   end
 
   def print_lost_tone
@@ -730,6 +745,10 @@ class Loader
     @sample = 0
     @index = 0
     @durations.step { |cur| step(cur) }
+    if @state == :process
+      step_process 0
+      step_lost
+    end
   end
 end
 
@@ -760,9 +779,16 @@ class Program
         puts opts
         exit
       end
+
+      opts.on_tail() do
+        if options[:file_name].nil?
+          puts opts
+          exit
+        end
+      end
     end.parse!
 
-    puts options.inspect
+    # puts options.inspect
 
     @loader = Loader.new(options)
   end
