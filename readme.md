@@ -40,7 +40,7 @@ Usage: orion_tape_parser.rb [options]
     -h, --help                       Вывод помощи
 ```
 
-Для работы скрипта необходим ruby 2.7.0 или выше. Также необходимы гемы wavefile и optparse:
+Для работы скрипта необходим ruby 2.7.0 или выше. Также необходимы гемы wavefile и optparse. Для Ubuntu Linux необходимо установить:
 ```
 sudo apt install ruby
 sudo gem install wavefile optparse 
