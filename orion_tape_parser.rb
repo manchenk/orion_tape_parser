@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 require 'wavefile'
 require 'optparse'
 
@@ -694,18 +696,18 @@ class Loader
 
   def print_lost_tone
     puts "Sync lost at sample: #{@sample}, pulse index: #{@index} (#{as_hex(@index)})"
-    puts "pulses: #{as_line(@index, 16)}"
+    puts "\tpulses: #{as_line(@index, 16)}"
   end
 
   def print_modul_error
     puts "Sync lost at sample: #{@sample}, pulse index: #{@index} (#{as_hex(@index)})"
-    puts "pulses: #{as_line(@index, 16)}"
+    puts "\tpulses: #{as_line(@index, 16)}"
   end
 
   def print_found_tone
     puts '*' * 80
     puts "Preamble found at sample: #{@sample}, pulse index: #{@index} (#{as_hex(@index)})"
-    puts "pulses: #{as_line(@index, 16)}"
+    puts "\tpulses: #{as_line(@index, 16)}"
   end
 
   def step_init(cur)
@@ -783,7 +785,7 @@ class Program
   def initialize
     options = {}
     OptionParser.new do |opts|
-      opts.banner = 'Usage: tape_loader.rb [options]'
+      opts.banner = 'Usage: orion_tape_parser.rb [options]'
 
       opts.on('-c CHANNEL', '--channel=CHANNEL', %i[left right both], 'Type of used channel (left (default), right, both)') do |v|
         options[:channel] = v
