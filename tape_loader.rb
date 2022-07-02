@@ -131,8 +131,8 @@ class DataFile
     @end = 0
     @length = 0
     @data = []
-    @crc_rd = 0
-    @crc_ld = 0
+    @crc_rd = nil
+    @crc_ld = nil
     @state = :unknown
   end
 
@@ -176,7 +176,8 @@ class DataFile
     @length = @data.length
     @base = 0
     @end = @length - 1
-    @file_name = 'raw data'
+    @file_name = 'data'
+    @file_ext = 'raw'
     :raw
   end
 
@@ -207,13 +208,21 @@ class DataFile
 
     # return :no_sync unless stream.next_byte
     @base = stream.word
-    return :no_base unless stream.next_word
+    #return :no_base unless stream.next_word
+    @data += [stream.byte]
+    return :no_base unless stream.next_byte
+    @data += [stream.byte]
+    return :no_base unless stream.next_byte
 
     @end = stream.word
     @length = @end - @base + 1
     return :negative_length if @length.negative?
 
-    return :no_length unless stream.next_word
+    #return :no_length unless stream.next_word
+    @data += [stream.byte]
+    return :no_base unless stream.next_byte
+    @data += [stream.byte]
+    return :no_base unless stream.next_byte
 
     @length.times do
       @data += [stream.byte]
@@ -226,8 +235,9 @@ class DataFile
     @crc_rd = stream.word
     return :no_crc unless stream.next_word
 
-    @file_name = "#{format('%<hex>04x', hex: @crc_rd)}.rk"
-    @crc_ld = crc(@data)
+    @file_name = "#{format('%<hex>04x', hex: @crc_rd)}"
+    @file_ext = 'rk'
+    @crc_ld = crc(@data[4..-1])
     return :bad_crc unless @crc_ld == @crc_rd
 
     :ok
@@ -246,14 +256,15 @@ class DataFile
       c = 0x3f if c < 0x20 || c > 0x7f || c == 0x2f || c == 0x5c
       @file_name += format('%<char>c', char: c)
     end
+    @file_name = "#{@file_name.rstrip}"
+    @file_ext = 'bru'
+
     8.times do
       return :no_header unless stream.next_byte
-
       return :not_orion unless stream.byte.zero?
     end
 
     return :no_header unless stream.next_byte
-
     return :no_sync unless stream.find_sync
 
     #return :no_sync unless stream.next_byte
@@ -305,16 +316,27 @@ class DataFile
     puts "\tname:   #{@file_name}" unless @file_name.nil?
     puts "\tbase:   #{format('%<hex>04x', hex: @base)}-#{format('%<hex>04x', hex: @end)}"
     puts "\tlength: #{format('%<hex>04x', hex: @length)}"
-    puts "\tCRC   : #{format('%<hex>04x', hex: @crc_rd)} -> #{format('%<hex>04x', hex: @crc_ld)}" unless @state == :raw
+    read_crc = @crc_rd.nil? ? '????' : "#{format('%<hex>04x', hex: @crc_rd)}"
+    calc_crc = @crc_ld.nil? ? '????' : "#{format('%<hex>04x', hex: @crc_ld)}"
+    puts "\tCRC:    #{read_crc} (read) -> #{calc_crc} (calc)" unless @state == :raw
     print_data
   end
 
   def save
     return unless @file_name
-
-    return unless @state == :ok
-
-    File.open(@file_name, 'w') do |r|
+    return unless @state == :ok  # uncomment if need save all data
+    name = @file_name
+    ext = @file_ext
+    name ||= ''
+    ext ||= ''
+    name = "bad_#{name}" unless @state == :ok
+    full = "#{name}.#{ext}"
+    count = 0
+    while File.exist?(full)
+      full = "#{name}_#{count}.#{ext}"
+      count += 1
+    end
+    File.open(full, 'w') do |r|
       r.write @data.pack('C*')
     end
   end
@@ -490,15 +512,17 @@ class Demodulator
   end
 
   def print_info
-    puts 'Statistics:'
-    puts "\tstream length:        #{@bitstream.length} (#{format('%<val>04x', val: (@bitstream.length >> 3))}+#{@bitstream.length & 7})"
-    puts "\taverage period:       #{format('%<val>3.1f', val: avg)} (#{@num})"
-    puts "\tshort average period: [#{format('%<val>3.1f', val: (avg * (1 - @delta)))}] #{@mins} < #{format('%<val>3.1f', val: avgs)} < #{@maxs} [#{format('%<val>3.1f', val: (avg * (1 + @delta)))}] (#{@nums})"
-    puts "\tshort distributions:  #{print_distrib(@freqs)}"
-    puts "\tshort dispersion:     #{format('%<val>3.1f', val: disps)}"
-    puts "\tlong average period:  [#{format('%<val>3.1f', val: (2 * avg * (1 - @delta / 2)))}] #{@minl} < #{format('%<val>3.1f', val: avgl)} < #{@maxl} [#{format('%<val>3.1f', val: (2 * avg * (1 + @delta / 2)))}] (#{@numl})"
-    puts "\tlong distributions:   #{print_distrib(@freql)}"
-    puts "\tlong dispersion:      #{format('%<val>3.1f', val: displ)}"
+    puts 'Statistic:'
+    puts "\tstream length, bits:    #{@bitstream.length} (#{format('%<val>04x', val: (@bitstream.length >> 3))}+#{@bitstream.length & 7})"
+    puts "\taverage pulse diration: #{format('%<val>3.1f', val: avg)} (#{@num})"
+    puts "\tshort pulses:"
+    puts "\t\taverage duration,      [#{format('%<val>3.1f', val: (avg * (1 - @delta)))}] #{@mins} < #{format('%<val>3.1f', val: avgs)} < #{@maxs} [#{format('%<val>3.1f', val: (avg * (1 + @delta)))}] (#{@nums})"
+    puts "\t\tduration distribution: #{print_distrib(@freqs)}"
+    puts "\t\tduratuin dispersion:   #{format('%<val>3.1f', val: disps)}"
+    puts "\tlong pulses:"
+    puts "\t\taverage duration:      [#{format('%<val>3.1f', val: (2 * avg * (1 - @delta / 2)))}] #{@minl} < #{format('%<val>3.1f', val: avgl)} < #{@maxl} [#{format('%<val>3.1f', val: (2 * avg * (1 + @delta / 2)))}] (#{@numl})"
+    puts "\t\tduration distribution: #{print_distrib(@freql)}"
+    puts "\t\tduration dispersion:   #{format('%<val>3.1f', val: displ)}"
   end
 end
 
@@ -662,24 +686,26 @@ class Loader
   end
 
   def print_dur
-    puts "durations length: #{@durations.length}"
-    puts "durations samples: #{@durations.sum}"
+    puts "Wave file loaded:"
+    puts "\tnumber of pulses: #{@durations.length}"
+    puts "\tnumber of samples: #{@durations.sum}"
+    puts "\taverage number of samples per pulse: #{format('%<val>3.1f', val: @durations.sum/@durations.length)}" unless @durations.length.zero?
   end
 
   def print_lost_tone
-    puts "Lost tone at sample: #{@sample}, duration index: #{@index} (#{as_hex(@index)})"
-    puts "durations: #{as_line(@index, 16)}"
+    puts "Sync lost at sample: #{@sample}, pulse index: #{@index} (#{as_hex(@index)})"
+    puts "pulses: #{as_line(@index, 16)}"
   end
 
   def print_modul_error
-    puts "Modulation error at sample: #{@sample}, duration index: #{@index} (#{as_hex(@index)})"
-    puts "durations: #{as_line(@index, 16)}"
+    puts "Sync lost at sample: #{@sample}, pulse index: #{@index} (#{as_hex(@index)})"
+    puts "pulses: #{as_line(@index, 16)}"
   end
 
   def print_found_tone
     puts '*' * 80
-    puts "Found tone at sample: #{@sample}, duration index: #{@index} (#{as_hex(@index)})"
-    puts "durations: #{as_line(@index, 16)}"
+    puts "Preamble found at sample: #{@sample}, pulse index: #{@index} (#{as_hex(@index)})"
+    puts "pulses: #{as_line(@index, 16)}"
   end
 
   def step_init(cur)
@@ -759,7 +785,7 @@ class Program
     OptionParser.new do |opts|
       opts.banner = 'Usage: tape_loader.rb [options]'
 
-      opts.on('-c CHANNEL', '--channel=CHANNEL', %i[left right both], 'Type of used channel (left, right, both)') do |v|
+      opts.on('-c CHANNEL', '--channel=CHANNEL', %i[left right both], 'Type of used channel (left (default), right, both)') do |v|
         options[:channel] = v
       end
 
@@ -767,7 +793,7 @@ class Program
         options[:delta] = v.to_f/100
       end
 
-      opts.on('-tN', '--tone=N', Integer, 'Minimal initial tone length in periods (default 16, 1 byte)') do |v|
+      opts.on('-tN', '--tone=N', Integer, 'Minimal initial tone length in periods (default 32, 2 byte)') do |v|
         options[:tone_length] = v
       end
 
