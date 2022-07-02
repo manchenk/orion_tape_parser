@@ -39,3 +39,9 @@ Usage: orion_tape_parser.rb [options]
     -f, --file=FILE                  Имя входного WAV файла
     -h, --help                       Вывод помощи
 ```
+
+Для работы скрипта необходим ruby 2.7.0 или выше. Также необходимы гемы wavefile и optparse:
+```
+sudo apt install ruby
+sudo gem install wavefile optparse 
+```
