@@ -700,7 +700,7 @@ class Loader
   end
 
   def print_modul_error
-    puts "Sync lost at sample: #{@sample}, pulse index: #{@index} (#{as_hex(@index)})"
+    puts "Modulation error at sample: #{@sample}, pulse index: #{@index} (#{as_hex(@index)})"
     puts "\tpulses: #{as_line(@index, 16)}"
   end
 
@@ -791,7 +791,7 @@ class Program
         options[:channel] = v
       end
 
-      opts.on('-dN', '--delta=N', Integer, 'Permissible deviation interval in percent (default 40%)') do |v|
+      opts.on('-dN', '--delta=N', Integer, 'Permissible deviation interval in percent (default 40%, maximum 50%)') do |v|
         options[:delta] = v.to_f/100
       end
 
@@ -812,6 +812,8 @@ class Program
         if options[:file_name].nil?
           puts opts
           exit
+        else
+          puts "Loading file: #{options[:file_name]}"
         end
       end
     end.parse!
